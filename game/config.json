@@ -1,10 +1,41 @@
 {
   "version": 1,
   "title": "Thread Game",
-  "arena": { "width": 800, "height": 600, "background": "#111111" },
-  "player": { "shape": "circle", "size": 14, "speed": 4, "color": "#ffffff" },
-  "entities": [],
+  "arena": {
+    "width": 800,
+    "height": 600,
+    "background": "#111111"
+  },
+  "player": {
+    "shape": "circle",
+    "size": 14,
+    "speed": 4,
+    "color": "#ffffff"
+  },
+  "entities": [
+    {
+      "id": "coin",
+      "type": "collectible",
+      "shape": "circle",
+      "color": "#ffd700",
+      "size": 8,
+      "count": 8,
+      "glow": true,
+      "respawn": true,
+      "points": 1
+    }
+  ],
   "rules": [],
-  "scoring": { "pointsPerSecondAlive": 0, "pointsPerCollect": 1 },
-  "changelog": []
+  "scoring": {
+    "pointsPerSecondAlive": 0,
+    "pointsPerCollect": 1
+  },
+  "changelog": [
+    {
+      "id": "2109859717312852053",
+      "author": "fred_huw",
+      "reply_url": "https://x.com/fred_huw/status/2109859717312852053",
+      "summary": "Added glowing yellow coins that respawn, +1 point each"
+    }
+  ]
 }

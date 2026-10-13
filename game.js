@@ -15,11 +15,12 @@
   };
 
   // Data-driven entities (added by the bot from X replies)
-  const entities = (cfg.entities || []).map((e) => {
+  const entities = (cfg.entities || []).flatMap((e) => Array.from({ length: Math.min(e.count || 1, 50) }, () => {
     const s = shape(e.color || "#ff0", e.size || 10, e.shape);
+    if (e.glow) { const h = new PIXI.Graphics().circle(0, 0, (e.size || 10) * 2).fill({ color: e.color || "#ff0", alpha: 0.25 }); s.addChildAt(h, 0); }
     s.x = e.x ?? Math.random() * cfg.arena.width; s.y = e.y ?? Math.random() * cfg.arena.height;
     s.meta = e; app.stage.addChild(s); return s;
-  });
+  }));
 
   const mine = shape(cfg.player.color, cfg.player.size, cfg.player.shape);
   app.stage.addChild(mine);
@@ -33,6 +34,7 @@
   app.canvas.addEventListener("pointermove", (e) => { if (target) target = e; });
   addEventListener("pointerup", () => { target = null; });
 
+  const now0 = () => performance.now();
   let net = null, lastSend = 0, alive = 0;
   app.ticker.add((t) => {
     const sp = cfg.player.speed * t.deltaTime;
@@ -51,10 +53,11 @@
 
     for (const s of entities) {
       if (s.visible && s.meta.type === "collectible" && Math.hypot(s.x - me.x, s.y - me.y) < (s.meta.size || 10) + cfg.player.size) {
-        s.visible = false; me.score += cfg.scoring.pointsPerCollect || 1;
+        s.visible = false; me.score += s.meta.points ?? (cfg.scoring.pointsPerCollect || 1);
         setTimeout(() => { s.x = Math.random() * cfg.arena.width; s.y = Math.random() * cfg.arena.height; s.visible = true; }, 1500);
       }
     }
+    for (const s of entities) if (s.meta.glow && s.visible) s.alpha = 0.75 + 0.25 * Math.sin(now0() / 200);
     alive += t.deltaMS / 1000;
     if (cfg.scoring.pointsPerSecondAlive && alive >= 1) { me.score += cfg.scoring.pointsPerSecondAlive; alive = 0; }
 
@@ -73,6 +76,13 @@
     li.append(a, document.createTextNode(": " + (c.summary || "")));
     cl.appendChild(li);
   }
+
+  // Top builders: accepted changes per X author, from the changelog
+  const tb = $("builders"); const counts = {};
+  for (const c of log) counts[c.author || "?"] = (counts[c.author || "?"] || 0) + 1;
+  const rowsB = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  if (!rowsB.length) tb.innerHTML = "<li>No builders yet.</li>";
+  for (const [n, k] of rowsB) { const li = document.createElement("li"); li.textContent = `@${n}: ${k} change${k === 1 ? "" : "s"}`; tb.appendChild(li); }
 
   // Scoreboard
   const local = new Map();
