@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Thread Game</title>
+<style>
+body{margin:0;background:#000;color:#ddd;font:14px system-ui,sans-serif;display:flex;flex-wrap:wrap;gap:12px;padding:12px}
+#stage{touch-action:none}
+aside{min-width:240px;max-width:320px}
+h2{font-size:14px;margin:8px 0 4px;color:#fff}
+ul{list-style:none;padding:0;margin:0}
+li{padding:3px 0;border-bottom:1px solid #222}
+#status{color:#888;font-size:12px}
+a{color:#7af}
+</style></head>
+<body>
+<div id="stage"></div>
+<aside>
+  <h1 id="title" style="font-size:18px;margin:0">Thread Game</h1>
+  <div id="status">loading…</div>
+  <h2>Live scoreboard</h2><ul id="scores"></ul>
+  <h2>Changelog (built by X replies)</h2><ul id="changelog"></ul>
+</aside>
+<script src="vendor/pixi.min.js"></script>
+<script src="vendor/supabase.js"></script>
+<script src="config.js"></script>
+<script src="game.js"></script>
+</body></html>

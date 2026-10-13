@@ -1,0 +1,118 @@
+(async () => {
+  const $ = (id) => document.getElementById(id);
+  const cfg = await (await fetch("game/config.json", { cache: "no-store" })).json();
+  $("title").textContent = cfg.title || "Thread Game";
+
+  const app = new PIXI.Application();
+  await app.init({ width: cfg.arena.width, height: cfg.arena.height, background: cfg.arena.background, antialias: true });
+  $("stage").appendChild(app.canvas);
+
+  const me = { id: (crypto.randomUUID?.() || String(Math.random()).slice(2)), name: "player-" + Math.floor(Math.random() * 1000), x: cfg.arena.width / 2, y: cfg.arena.height / 2, score: 0 };
+  const shape = (color, size, kind) => {
+    const g = new PIXI.Graphics();
+    if (kind === "square") g.rect(-size, -size, size * 2, size * 2); else g.circle(0, 0, size);
+    return g.fill(color);
+  };
+
+  // Data-driven entities (added by the bot from X replies)
+  const entities = (cfg.entities || []).map((e) => {
+    const s = shape(e.color || "#ff0", e.size || 10, e.shape);
+    s.x = e.x ?? Math.random() * cfg.arena.width; s.y = e.y ?? Math.random() * cfg.arena.height;
+    s.meta = e; app.stage.addChild(s); return s;
+  });
+
+  const mine = shape(cfg.player.color, cfg.player.size, cfg.player.shape);
+  app.stage.addChild(mine);
+  const others = new Map();
+
+  // Input: keys + touch/pointer drag target
+  const keys = {}; let target = null;
+  addEventListener("keydown", (e) => { keys[e.key.toLowerCase()] = true; });
+  addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
+  app.canvas.addEventListener("pointerdown", (e) => { target = e; });
+  app.canvas.addEventListener("pointermove", (e) => { if (target) target = e; });
+  addEventListener("pointerup", () => { target = null; });
+
+  let net = null, lastSend = 0, alive = 0;
+  app.ticker.add((t) => {
+    const sp = cfg.player.speed * t.deltaTime;
+    if (keys.arrowleft || keys.a) me.x -= sp;
+    if (keys.arrowright || keys.d) me.x += sp;
+    if (keys.arrowup || keys.w) me.y -= sp;
+    if (keys.arrowdown || keys.s) me.y += sp;
+    if (target) {
+      const r = app.canvas.getBoundingClientRect();
+      const dx = target.clientX - r.left - me.x, dy = target.clientY - r.top - me.y, d = Math.hypot(dx, dy);
+      if (d > 2) { me.x += (dx / d) * sp; me.y += (dy / d) * sp; }
+    }
+    me.x = Math.max(0, Math.min(cfg.arena.width, me.x));
+    me.y = Math.max(0, Math.min(cfg.arena.height, me.y));
+    mine.x = me.x; mine.y = me.y;
+
+    for (const s of entities) {
+      if (s.visible && s.meta.type === "collectible" && Math.hypot(s.x - me.x, s.y - me.y) < (s.meta.size || 10) + cfg.player.size) {
+        s.visible = false; me.score += cfg.scoring.pointsPerCollect || 1;
+        setTimeout(() => { s.x = Math.random() * cfg.arena.width; s.y = Math.random() * cfg.arena.height; s.visible = true; }, 1500);
+      }
+    }
+    alive += t.deltaMS / 1000;
+    if (cfg.scoring.pointsPerSecondAlive && alive >= 1) { me.score += cfg.scoring.pointsPerSecondAlive; alive = 0; }
+
+    const now = performance.now();
+    if (net && now - lastSend > 100) { lastSend = now; net.move(); }
+  });
+
+  // Changelog panel
+  const cl = $("changelog");
+  const log = cfg.changelog || [];
+  if (!log.length) cl.innerHTML = "<li>Blank. Reply on the X thread to build it.</li>";
+  for (const c of [...log].reverse()) {
+    const li = document.createElement("li");
+    const a = document.createElement("a");
+    a.href = c.reply_url; a.target = "_blank"; a.rel = "noopener"; a.textContent = "@" + (c.author || "?");
+    li.append(a, document.createTextNode(": " + (c.summary || "")));
+    cl.appendChild(li);
+  }
+
+  // Scoreboard
+  const local = new Map();
+  const renderScores = (rows) => {
+    const ul = $("scores"); ul.innerHTML = "";
+    for (const r of rows.sort((a, b) => b.score - a.score).slice(0, 10)) {
+      const li = document.createElement("li"); li.textContent = `${r.name}: ${r.score}`; ul.appendChild(li);
+    }
+  };
+
+  const C = window.THREAD_GAME_CONFIG || {};
+  const configured = C.SUPABASE_URL && !C.SUPABASE_URL.startsWith("YOUR_") && window.supabase;
+  if (!configured) {
+    $("status").textContent = "Single-player (Supabase not configured)";
+    setInterval(() => renderScores([{ name: me.name + " (you)", score: me.score }]), 500);
+    return;
+  }
+
+  const sb = window.supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY);
+  const { data: auth } = await sb.auth.signInAnonymously();
+  const uid = auth?.user?.id;
+  const ch = sb.channel("arena", { config: { presence: { key: me.id }, broadcast: { self: false } } });
+  ch.on("broadcast", { event: "move" }, ({ payload: p }) => {
+    let o = others.get(p.id);
+    if (!o) { o = shape("#4af", cfg.player.size, cfg.player.shape); app.stage.addChild(o); others.set(p.id, o); }
+    o.x = p.x; o.y = p.y;
+  });
+  ch.on("presence", { event: "leave" }, ({ key }) => { const o = others.get(key); if (o) { o.destroy(); others.delete(key); } });
+  ch.on("presence", { event: "sync" }, () => { $("status").textContent = `Online: ${Object.keys(ch.presenceState()).length}`; });
+  await ch.subscribe(async (s) => { if (s === "SUBSCRIBED") await ch.track({ name: me.name }); });
+  net = { move: () => ch.send({ type: "broadcast", event: "move", payload: { id: me.id, x: me.x, y: me.y } }) };
+
+  const loadScores = async () => {
+    const { data } = await sb.from("scores").select("name,score").order("score", { ascending: false }).limit(10);
+    if (data) renderScores(data);
+  };
+  sb.channel("scores-db").on("postgres_changes", { event: "*", schema: "public", table: "scores" }, loadScores).subscribe();
+  loadScores();
+  let lastScore = -1;
+  setInterval(async () => {   // light usage: upsert at most every 5s, only on change
+    if (uid && me.score !== lastScore) { lastScore = me.score; await sb.from("scores").upsert({ user_id: uid, name: me.name, score: me.score }); }
+  }, 5000);
+})();

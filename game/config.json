@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "title": "Thread Game",
+  "arena": { "width": 800, "height": 600, "background": "#111111" },
+  "player": { "shape": "circle", "size": 14, "speed": 4, "color": "#ffffff" },
+  "entities": [],
+  "rules": [],
+  "scoring": { "pointsPerSecondAlive": 0, "pointsPerCollect": 1 },
+  "changelog": []
+}
