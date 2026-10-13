@@ -23,6 +23,17 @@
       "glow": true,
       "respawn": true,
       "points": 1
+    },
+    {
+      "id": "chaser",
+      "type": "enemy",
+      "shape": "circle",
+      "color": "#e53935",
+      "size": 12,
+      "count": 1,
+      "speed": 2.2,
+      "behavior": "chase_closest",
+      "onHit": "score-1"
     }
   ],
   "rules": [],
@@ -36,6 +47,12 @@
       "author": "fred_huw",
       "reply_url": "https://x.com/fred_huw/status/2109859717312852053",
       "summary": "Added glowing yellow coins that respawn, +1 point each"
+    },
+    {
+      "id": "2109861845200724190",
+      "author": "fred_huw",
+      "reply_url": "https://x.com/fred_huw/status/2109861845200724190",
+      "summary": "Added a red enemy that chases the closest player; touch costs 1 point"
     }
   ]
 }

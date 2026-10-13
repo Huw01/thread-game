@@ -57,6 +57,31 @@
         setTimeout(() => { s.x = Math.random() * cfg.arena.width; s.y = Math.random() * cfg.arena.height; s.visible = true; }, 1500);
       }
     }
+    // Enemies: chase closest visible player (local + others), touch deducts score once per hit
+    const players = [{ x: me.x, y: me.y, local: true }];
+    for (const o of others.values()) if (o && Number.isFinite(o.x)) players.push({ x: o.x, y: o.y, local: false });
+    for (const s of entities) {
+      if (!s.visible || s.meta.type !== "enemy" || s.meta.behavior !== "chase_closest") continue;
+      let best = null, bestD = Infinity;
+      for (const p of players) {
+        const d = Math.hypot(s.x - p.x, s.y - p.y);
+        if (d < bestD) { bestD = d; best = p; }
+      }
+      if (best && bestD > 0.5) {
+        const esp = (s.meta.speed || 2) * t.deltaTime;
+        s.x += ((best.x - s.x) / bestD) * esp;
+        s.y += ((best.y - s.y) / bestD) * esp;
+        s.x = Math.max(0, Math.min(cfg.arena.width, s.x));
+        s.y = Math.max(0, Math.min(cfg.arena.height, s.y));
+      }
+      if (best && best.local && bestD < (s.meta.size || 10) + cfg.player.size) {
+        if (!s._hitCool) {
+          s._hitCool = true;
+          if (s.meta.onHit === "score-1") me.score = Math.max(0, me.score - 1);
+          setTimeout(() => { s._hitCool = false; }, 800);
+        }
+      }
+    }
     for (const s of entities) if (s.meta.glow && s.visible) s.alpha = 0.75 + 0.25 * Math.sin(now0() / 200);
     alive += t.deltaMS / 1000;
     if (cfg.scoring.pointsPerSecondAlive && alive >= 1) { me.score += cfg.scoring.pointsPerSecondAlive; alive = 0; }
